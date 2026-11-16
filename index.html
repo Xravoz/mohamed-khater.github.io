@@ -130,12 +130,12 @@ function parseMd(name, txt){
 }
 async function loadPosts(){
   try{
-    const files = await (await fetch("posts/index.json",{cache:"no-store"})).json();
+    const files = await (await fetch("posts/index.json?v="+Date.now(),{cache:"no-store"})).json();
     const miss = [];
     const got = await Promise.all(files.map(async f => {
-      const r = await fetch("posts/"+encodeURIComponent(f));
+      const r = await fetch("posts/"+encodeURIComponent(f)+"?v="+Date.now(), {cache:"no-store"});
       const t = r.ok ? await r.text() : "";
-      if(!r.ok || /^\s*<!doctype html/i.test(t)){ miss.push(f); return null; }
+      if(!r.ok || /^\s*<!doctype html/i.test(t)){ miss.push(f+" ["+r.status+"]"); return null; }
       return parseMd(f, t);
     }));
     POSTS = got.filter(Boolean); MISSING = miss;
