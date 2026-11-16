@@ -3,15 +3,18 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
 <title>SOC Log</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
 <style>
 :root[data-theme="dark"]{
+  color-scheme:dark;
   --bg:#0a0a0b; --surface:#131316; --line:#27272c; --text:#f4f4f5; --muted:#a1a1aa; --accent:#8ab4ff;
 }
 :root[data-theme="light"]{
+  color-scheme:light;
   --bg:#ffffff; --surface:#f5f5f6; --line:#e4e4e7; --text:#09090b; --muted:#52525b; --accent:#1d4ed8;
 }
 :root{
@@ -20,7 +23,7 @@
   --easy:#6ea8fe; --medium:#f5b942; --hard:#ff6b6b; --done:#4ade80;
 }
 *{box-sizing:border-box}
-html{scroll-behavior:smooth}
+html{scroll-behavior:smooth;background:var(--bg);min-height:100%}
 body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17px;line-height:1.85;-webkit-font-smoothing:antialiased}
 a{color:inherit;text-decoration:none}
 :focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:4px}
@@ -61,6 +64,8 @@ nav a:hover,nav button:hover{color:var(--text)}
 .lv{display:inline-flex;align-items:center;gap:7px}
 .lv i{width:8px;height:8px;border-radius:50%;background:var(--c)}
 .empty{padding:50px 0;color:var(--muted)}
+.warn{margin-top:26px;padding:14px 18px;border:1px solid var(--hard);border-radius:10px;font-size:15px;color:var(--text)}
+.warn code{font-family:var(--mono);direction:ltr;unicode-bidi:isolate}
 
 .post{padding:20px 0 90px}
 .back{color:var(--muted);font-size:15px}
@@ -111,7 +116,7 @@ const LV = {easy:"سهل", medium:"متوسط", hard:"صعب", done:"متقن"};
 const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const state = {q:"", cat:"", tag:""};
-let POSTS = [], sorted = [];
+let POSTS = [], sorted = [], MISSING = [];
 
 function parseMd(name, txt){
   const m = txt.replace(/\r/g,"").match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/);
@@ -119,13 +124,21 @@ function parseMd(name, txt){
   if(m) m[1].split("\n").forEach(l => { const i = l.indexOf(":"); if(i>0) meta[l.slice(0,i).trim()] = l.slice(i+1).trim(); });
   const id = name.replace(/\.md$/,"");
   const tags = (meta.tags||"").replace(/^\[|\]$/g,"").split(",").map(t=>t.trim()).filter(Boolean);
-  return {id, title:meta.title||id, date:meta.date||"", category:meta.category||"General",
+  const h1 = (body.match(/^#\s+(.+)$/m)||[])[1];
+  return {id, title:meta.title||h1||id, date:meta.date||"", category:meta.category||"General",
           tags, level:LV[meta.level]?meta.level:"easy", summary:meta.summary||"", body};
 }
 async function loadPosts(){
   try{
     const files = await (await fetch("posts/index.json",{cache:"no-store"})).json();
-    POSTS = await Promise.all(files.map(async f => parseMd(f, await (await fetch("posts/"+encodeURIComponent(f))).text())));
+    const miss = [];
+    const got = await Promise.all(files.map(async f => {
+      const r = await fetch("posts/"+encodeURIComponent(f));
+      const t = r.ok ? await r.text() : "";
+      if(!r.ok || /^\s*<!doctype html/i.test(t)){ miss.push(f); return null; }
+      return parseMd(f, t);
+    }));
+    POSTS = got.filter(Boolean); MISSING = miss;
     sorted = [...POSTS].sort((a,b) => b.date.localeCompare(a.date));
   }catch(e){
     $("#app").innerHTML = `<div class="empty">تعذّر تحميل المقالات. لو بتفتح الملف من الجهاز مباشرة، شغّل <code>python -m http.server</code> أو ارفعه على GitHub Pages.</div>`;
@@ -159,6 +172,7 @@ function renderList(){
     </div>
     <div class="tags">${tags.map(t => `<button class="${state.tag===t?"on":""}" data-tag="${esc(t)}">#${esc(t)}</button>`).join("")}</div>
   </section>
+  ${MISSING.length ? `<div class="warn">الملفات دي مكتوبة في <code>posts/index.json</code> بس مش موجودة في فولدر <code>posts</code>: ${MISSING.map(f=>`<code>${esc(f)}</code>`).join(" ")}</div>` : ""}
   <section class="list">
     ${list.length ? list.map(p => `
       <a class="item" href="#post-${esc(p.id)}">
