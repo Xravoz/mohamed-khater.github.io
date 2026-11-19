@@ -63,6 +63,7 @@ nav a:hover,nav button:hover{color:var(--text)}
 .meta{display:flex;flex-wrap:wrap;align-items:center;gap:6px 16px;margin-top:12px;font-size:14px;color:var(--muted)}
 .lv{display:inline-flex;align-items:center;gap:7px}
 .lv i{width:8px;height:8px;border-radius:50%;background:var(--c)}
+.item[dir=ltr] .d{text-align:left}
 .empty{padding:50px 0;color:var(--muted)}
 .warn{margin-top:26px;padding:14px 18px;border:1px solid var(--hard);border-radius:10px;font-size:15px;color:var(--text)}
 .warn code{font-family:var(--mono);direction:ltr;unicode-bidi:isolate}
@@ -126,7 +127,7 @@ function parseMd(name, txt){
   const tags = (meta.tags||"").replace(/^\[|\]$/g,"").split(",").map(t=>t.trim()).filter(Boolean);
   const h1 = (body.match(/^#\s+(.+)$/m)||[])[1];
   return {id, title:meta.title||h1||id, date:meta.date||"", category:meta.category||"General",
-          tags, level:LV[meta.level]?meta.level:"easy", summary:meta.summary||"", body};
+          tags, dir:meta.dir==="ltr"?"ltr":"rtl", level:LV[meta.level]?meta.level:"easy", summary:meta.summary||"", body};
 }
 async function loadPosts(){
   try{
@@ -175,7 +176,7 @@ function renderList(){
   ${MISSING.length ? `<div class="warn">الملفات دي مكتوبة في <code>posts/index.json</code> بس مش موجودة في فولدر <code>posts</code>: ${MISSING.map(f=>`<code>${esc(f)}</code>`).join(" ")}</div>` : ""}
   <section class="list">
     ${list.length ? list.map(p => `
-      <a class="item" href="#post-${esc(p.id)}">
+      <a class="item" dir="${p.dir}" href="#post-${esc(p.id)}">
         <div class="d">${esc(p.date)}</div>
         <h2>${esc(p.title)}</h2>
         ${p.summary ? `<p>${esc(p.summary)}</p>` : ""}
@@ -191,8 +192,8 @@ function renderPost(id){
   const p = POSTS.find(x => x.id === id);
   if(!p){ location.hash = ""; return; }
   $("#app").innerHTML = `
-  <article class="post">
-    <a class="back" href="#">→ كل المقالات</a>
+  <article class="post" dir="${p.dir}">
+    <a class="back" href="#">${p.dir==="ltr" ? "← All posts" : "→ كل المقالات"}</a>
     <h1>${esc(p.title)}</h1>
     <div class="meta"><span style="font-family:var(--mono);direction:ltr">${esc(p.date)}</span><bdi>${esc(p.category)}</bdi>${lvHtml(p.level)}</div>
     <div class="prose">${marked.parse(p.body.trim(), {gfm:true})}</div>
